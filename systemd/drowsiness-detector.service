@@ -1,0 +1,16 @@
+[Unit]
+Description=Driver Drowsiness Detection System
+After=network.target
+
+[Service]
+Type=simple
+User=abdo
+WorkingDirectory=/home/abdo/drowsiness-detector
+ExecStart=/home/abdo/drowsiness-detector/venv/bin/python3 /home/abdo/drowsiness-detector/main.py
+Restart=on-failure
+RestartSec=5
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+
+[Install]
+WantedBy=multi-user.target
