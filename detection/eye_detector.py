@@ -16,6 +16,7 @@ class EyeDetector:
     def __init__(self, config: Config):
         self._config = config
         self._closed_frames = 0
+        self._open_frames = 0
         self._ear = 0.0
         self._state = EyeState.AWAKE
 
@@ -36,8 +37,11 @@ class EyeDetector:
 
         if self._ear < self._config.ear_threshold:
             self._closed_frames += 1
+            self._open_frames = 0
         else:
-            self._closed_frames = 0
+            self._open_frames += 1
+            if self._open_frames >= self._config.ear_open_frames_reset:
+                self._closed_frames = 0
 
         if self._closed_frames >= self._config.ear_microsleep_frames:
             self._state = EyeState.MICROSLEEP
@@ -50,6 +54,7 @@ class EyeDetector:
 
     def reset(self):
         self._closed_frames = 0
+        self._open_frames = 0
         self._state = EyeState.AWAKE
 
     def _compute_avg_ear(self, landmarks: np.ndarray) -> float:

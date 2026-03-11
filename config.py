@@ -13,14 +13,18 @@ class Config:
 
     # Eye Aspect Ratio (EAR)
     ear_threshold: float = 0.21
-    ear_consec_frames: int = 30       # ~1s at 30fps -> DROWSY
-    ear_microsleep_frames: int = 90   # ~3s at 30fps -> MICROSLEEP
+    ear_consec_frames: int = 10        # ~1s at 10 processed fps -> DROWSY
+    ear_microsleep_frames: int = 30   # ~3s at 10 processed fps -> MICROSLEEP
+    ear_open_frames_reset: int = 3    # consecutive open frames to reset counter
 
     # Mouth Aspect Ratio (MAR)
     mar_threshold: float = 0.75
     yawn_min_frames: int = 10         # min frames mouth open to count as yawn
     yawn_count_threshold: int = 3     # yawns in window -> alarm
     yawn_window_seconds: int = 300    # 5 minutes
+
+    # Face lost grace period
+    face_lost_grace_frames: int = 30  # ~3s at 10 processed fps
 
     # Alarm
     alarm_cooldown_seconds: float = 5.0

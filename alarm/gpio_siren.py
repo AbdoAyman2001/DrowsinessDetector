@@ -17,16 +17,16 @@ class GpioSiren:
         if _GPIO_AVAILABLE:
             GPIO.setwarnings(False)
             GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self._pin, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(self._pin, GPIO.OUT, initial=GPIO.HIGH)
 
     def on(self):
         if _GPIO_AVAILABLE and not self._active:
-            GPIO.output(self._pin, GPIO.HIGH)
+            GPIO.output(self._pin, GPIO.LOW)
             self._active = True
 
     def off(self):
         if _GPIO_AVAILABLE and self._active:
-            GPIO.output(self._pin, GPIO.LOW)
+            GPIO.output(self._pin, GPIO.HIGH)
             self._active = False
 
     def close(self):

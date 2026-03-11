@@ -28,14 +28,27 @@ class DetectorEngine:
         self.face_mesh = FaceMeshDetector()
         self.eye_detector = EyeDetector(config)
         self.yawn_detector = YawnDetector(config)
+        self._face_lost_frames = 0
+        self._prev_alarm_level = AlarmLevel.NONE
+        self._prev_eye_state = EyeState.AWAKE
+        self._prev_ear = 0.0
+        self._prev_mar = 0.0
 
     def process_frame(self, bgr_frame: np.ndarray) -> DetectionResult:
         result = DetectionResult()
 
         landmarks = self.face_mesh.process(bgr_frame)
         if landmarks is None:
+            if (self._prev_alarm_level != AlarmLevel.NONE
+                    and self._face_lost_frames < self._config.face_lost_grace_frames):
+                self._face_lost_frames += 1
+                result.alarm_level = self._prev_alarm_level
+                result.eye_state = self._prev_eye_state
+                result.ear = self._prev_ear
+                result.mar = self._prev_mar
             return result
 
+        self._face_lost_frames = 0
         result.face_detected = True
 
         eye_state = self.eye_detector.update(landmarks)
@@ -54,6 +67,11 @@ class DetectorEngine:
             result.alarm_level = AlarmLevel.WARNING
         else:
             result.alarm_level = AlarmLevel.NONE
+
+        self._prev_alarm_level = result.alarm_level
+        self._prev_eye_state = result.eye_state
+        self._prev_ear = result.ear
+        self._prev_mar = result.mar
 
         return result
 
