@@ -64,6 +64,10 @@ class Application:
         self._prev_eye_state = EyeState.AWAKE
         self._prev_yawn_count = 0
 
+        # Snapshots directory for photos
+        self._snapshots_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "snapshots")
+        os.makedirs(self._snapshots_dir, exist_ok=True)
+
     def start(self):
         self._running = True
 
@@ -162,6 +166,8 @@ class Application:
                     session_id, "microsleep", result.ear, result.mar,
                     self._engine.eye_detector.closed_frames,
                 )
+                # Save photo and send GSM alert
+                self._trigger_gsm_alert()
             self._prev_eye_state = result.eye_state
 
         # New yawn
@@ -172,6 +178,20 @@ class Application:
         elif result.yawn_count < self._prev_yawn_count:
             # Window pruned old yawns
             self._prev_yawn_count = result.yawn_count
+
+    def _trigger_gsm_alert(self):
+        frame = self._shared.get("raw_frame")
+        photo_path = ""
+        if frame is not None:
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            photo_path = os.path.join(self._snapshots_dir, f"{timestamp}.jpg")
+            try:
+                cv2.imwrite(photo_path, frame)
+                log.info(f"Microsleep photo saved: {photo_path}")
+            except Exception as e:
+                log.error(f"Failed to save photo: {e}")
+                photo_path = ""
+        self._alarm_manager.send_gsm_alert(photo_path)
 
     @staticmethod
     def _read_cpu_temp() -> float | None:

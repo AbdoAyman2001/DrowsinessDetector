@@ -3,6 +3,7 @@ import time
 from config import Config
 from alarm.audio_alarm import AudioAlarm
 from alarm.gpio_siren import GpioSiren
+from alarm.gsm_alarm import GsmAlarm
 from detection.detector_engine import AlarmLevel
 
 
@@ -11,6 +12,12 @@ class AlarmManager:
         self._config = config
         self._audio = AudioAlarm()
         self._siren = GpioSiren()
+        self._gsm = None
+        if config.gsm_enabled:
+            self._gsm = GsmAlarm(
+                config.gsm_port, config.gsm_baud,
+                config.gsm_phone_number, config.driver_name,
+            )
         self._current_level = AlarmLevel.NONE
         self._last_trigger_time = 0.0
 
@@ -67,6 +74,10 @@ class AlarmManager:
 
         threading.Thread(target=_stop, daemon=True).start()
 
+    def send_gsm_alert(self, photo_path: str = ""):
+        if self._gsm:
+            self._gsm.send_alert(photo_path)
+
     def stop(self):
         self._audio.stop()
         self._siren.off()
@@ -75,3 +86,5 @@ class AlarmManager:
     def close(self):
         self._audio.close()
         self._siren.close()
+        if self._gsm:
+            self._gsm.close()

@@ -23,7 +23,7 @@ class FaceMeshDetector:
         self._frame_count += 1
 
         # Process every 3rd frame, return cached result otherwise
-        if self._frame_count % 3 != 1:
+        if self._frame_count % 5 != 1:
             return self._cached_landmarks
 
         gray = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2GRAY)

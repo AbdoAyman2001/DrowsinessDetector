@@ -13,18 +13,18 @@ class Config:
 
     # Eye Aspect Ratio (EAR)
     ear_threshold: float = 0.21
-    ear_consec_frames: int = 10        # ~1s at 10 processed fps -> DROWSY
-    ear_microsleep_frames: int = 30   # ~3s at 10 processed fps -> MICROSLEEP
-    ear_open_frames_reset: int = 3    # consecutive open frames to reset counter
+    ear_consec_frames: int = 6          # ~1s at 6 processed fps -> DROWSY
+    ear_microsleep_frames: int = 18    # ~3s at 6 processed fps -> MICROSLEEP
+    ear_open_frames_reset: int = 2     # consecutive open frames to reset counter
 
     # Mouth Aspect Ratio (MAR)
     mar_threshold: float = 0.75
-    yawn_min_frames: int = 10         # min frames mouth open to count as yawn
+    yawn_min_frames: int = 6          # min frames mouth open to count as yawn
     yawn_count_threshold: int = 3     # yawns in window -> alarm
     yawn_window_seconds: int = 300    # 5 minutes
 
     # Face lost grace period
-    face_lost_grace_frames: int = 30  # ~3s at 10 processed fps
+    face_lost_grace_frames: int = 18  # ~3s at 6 processed fps
 
     # Alarm
     alarm_cooldown_seconds: float = 5.0
@@ -45,10 +45,11 @@ class Config:
     snapshot_interval: int = 30
 
     # GSM (future)
-    gsm_enabled: bool = False
-    gsm_port: str = "/dev/ttyUSB0"
-    gsm_baud: int = 115200
-    gsm_phone_number: str = ""
+    gsm_enabled: bool = True
+    gsm_port: str = "/dev/serial0"
+    gsm_baud: int = 9600
+    gsm_phone_number: str = "+201102423810"
+    driver_name: str = ""
 
     _config_path: str = field(default="config.json", repr=False)
 
