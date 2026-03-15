@@ -7,6 +7,9 @@ MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sha
 
 
 class FaceMeshDetector:
+    HOG_EVERY_N = 10             # full HOG every 10 frames
+    TRACKER_CONFIDENCE = 7.0     # re-detect if tracker score drops below this
+
     def __init__(self):
         if not os.path.exists(MODEL_PATH):
             raise FileNotFoundError(
@@ -15,26 +18,45 @@ class FaceMeshDetector:
             )
         self._detector = dlib.get_frontal_face_detector()
         self._predictor = dlib.shape_predictor(MODEL_PATH)
+        self._tracker = dlib.correlation_tracker()
+        self._tracking = False
         self._frame_count = 0
-        self._cached_landmarks = None
 
-    def process(self, bgr_frame: np.ndarray):
-        """Process a BGR frame. Returns list of 68 (x,y) landmark points or None."""
+    def process(self, gray: np.ndarray):
+        """Process a grayscale frame. Returns list of 68 (x,y) landmark points or None."""
         self._frame_count += 1
+        need_detect = (
+            not self._tracking
+            or self._frame_count % self.HOG_EVERY_N == 0
+        )
 
-        # Process every 3rd frame, return cached result otherwise
-        if self._frame_count % 5 != 1:
-            return self._cached_landmarks
+        if need_detect:
+            faces = self._detector(gray, 0)
+            if not faces:
+                self._tracking = False
+                return None
+            self._tracker.start_track(gray, faces[0])
+            self._tracking = True
+            rect = faces[0]
+        else:
+            score = self._tracker.update(gray)
+            if score < self.TRACKER_CONFIDENCE:
+                # Tracker lost confidence, force re-detect
+                faces = self._detector(gray, 0)
+                if not faces:
+                    self._tracking = False
+                    return None
+                self._tracker.start_track(gray, faces[0])
+                rect = faces[0]
+            else:
+                pos = self._tracker.get_position()
+                rect = dlib.rectangle(
+                    int(pos.left()), int(pos.top()),
+                    int(pos.right()), int(pos.bottom())
+                )
 
-        gray = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2GRAY)
-        faces = self._detector(gray, 0)          # full-res, no downsample
-        if not faces:
-            self._cached_landmarks = None
-            return None
-
-        shape = self._predictor(gray, faces[0])
+        shape = self._predictor(gray, rect)
         landmarks = np.array([(shape.part(i).x, shape.part(i).y) for i in range(68)])
-        self._cached_landmarks = landmarks
         return landmarks
 
     def close(self):

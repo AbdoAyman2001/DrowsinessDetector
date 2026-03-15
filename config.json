@@ -4,11 +4,11 @@
   "camera_format": "RGB888",
   "camera_buffer_count": 4,
   "ear_threshold": 0.21,
-  "ear_consec_frames": 6,
-  "ear_microsleep_frames": 18,
-  "ear_open_frames_reset": 2,
+  "ear_consec_frames": 10,
+  "ear_microsleep_frames": 30,
+  "ear_open_frames_reset": 3,
   "mar_threshold": 0.75,
-  "yawn_min_frames": 6,
+  "yawn_min_frames": 10,
   "yawn_count_threshold": 3,
   "yawn_window_seconds": 300,
   "alarm_cooldown_seconds": 5.0,
@@ -25,5 +25,6 @@
   "gsm_port": "/dev/serial0",
   "gsm_baud": 9600,
   "gsm_phone_number": "+201102423810",
-  "driver_name": "عبدالرحمن"
+  "driver_name": "عبدالرحمن",
+  "face_lost_grace_frames": 30
 }

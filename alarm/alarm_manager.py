@@ -58,7 +58,8 @@ class AlarmManager:
                     self._config.critical_freq_high,
                     self._config.alarm_volume,
                 )
-            self._siren.on()
+            if alarm_level == AlarmLevel.CRITICAL:
+                self._siren.on()
             self._current_level = alarm_level
             self._last_trigger_time = now
 

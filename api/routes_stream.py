@@ -16,7 +16,8 @@ def _generate_mjpeg(shared):
         if frame is None:
             continue
 
-        ret, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        small = cv2.resize(frame, (640, 360), interpolation=cv2.INTER_AREA)
+        ret, jpeg = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 70])
         if not ret:
             continue
 

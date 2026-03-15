@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 from config import Config
 from detection.face_mesh import FaceMeshDetector
@@ -37,7 +38,8 @@ class DetectorEngine:
     def process_frame(self, bgr_frame: np.ndarray) -> DetectionResult:
         result = DetectionResult()
 
-        landmarks = self.face_mesh.process(bgr_frame)
+        gray = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2GRAY)
+        landmarks = self.face_mesh.process(gray)
         if landmarks is None:
             if (self._prev_alarm_level != AlarmLevel.NONE
                     and self._face_lost_frames < self._config.face_lost_grace_frames):
@@ -46,6 +48,9 @@ class DetectorEngine:
                 result.eye_state = self._prev_eye_state
                 result.ear = self._prev_ear
                 result.mar = self._prev_mar
+            else:
+                # Grace expired or no prior alarm — reset to prevent re-latching
+                self._prev_alarm_level = AlarmLevel.NONE
             return result
 
         self._face_lost_frames = 0

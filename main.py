@@ -134,7 +134,7 @@ class Application:
                     f"Eye={result.eye_state} Yawns={result.yawn_count} Alarm={result.alarm_level}"
                 )
 
-            time.sleep(0.033)  # cap at ~30 fps, prevent CPU spin on cached frames
+            time.sleep(0.1)  # ~10 FPS detection rate (correlation tracker makes this viable)
 
     def _start_api(self):
         app = create_app(self._shared)
