@@ -58,11 +58,16 @@ class Application:
             "raw_frame": None,
             "annotated_frame": None,
             "frame_ready": threading.Event(),
+            "stream_clients": 0,
         }
 
         # Event tracking to avoid duplicate DB entries
         self._prev_eye_state = EyeState.AWAKE
         self._prev_yawn_count = 0
+
+        # CPU temp cache
+        self._last_cpu_temp: float | None = None
+        self._last_cpu_temp_time: float = 0.0
 
         # Snapshots directory for photos
         self._snapshots_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "snapshots")
@@ -94,11 +99,17 @@ class Application:
             self._shutdown(session_id)
 
     def _capture_loop(self):
+        interval = 1.0 / 12  # cap at 12 FPS; detection only needs 8
+        next_time = time.monotonic()
         while self._running:
             frame = self._camera.get_frame()
             bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             self._shared["raw_frame"] = bgr
             self._shared["frame_ready"].set()
+            next_time += interval
+            sleep_dur = next_time - time.monotonic()
+            if sleep_dur > 0:
+                time.sleep(sleep_dur)
 
     def _detection_loop(self, session_id: int):
         last_snapshot = time.time()
@@ -112,8 +123,9 @@ class Application:
             result = self._engine.process_frame(frame)
             self._shared["latest_result"] = result
 
-            annotated = self._annotate_frame(frame.copy(), result, self._read_cpu_temp())
-            self._shared["annotated_frame"] = annotated
+            if self._shared["stream_clients"] > 0:
+                annotated = self._annotate_frame(frame.copy(), result, self._read_cpu_temp())
+                self._shared["annotated_frame"] = annotated
 
             self._alarm_manager.update(result.alarm_level)
             self._log_events(session_id, result)
@@ -134,7 +146,7 @@ class Application:
                     f"Eye={result.eye_state} Yawns={result.yawn_count} Alarm={result.alarm_level}"
                 )
 
-            time.sleep(0.1)  # ~10 FPS detection rate (correlation tracker makes this viable)
+            time.sleep(0.125)  # ~8 FPS detection rate
 
     def _start_api(self):
         app = create_app(self._shared)
@@ -193,13 +205,17 @@ class Application:
                 photo_path = ""
         self._alarm_manager.send_gsm_alert(photo_path)
 
-    @staticmethod
-    def _read_cpu_temp() -> float | None:
+    def _read_cpu_temp(self) -> float | None:
+        now = time.monotonic()
+        if now - self._last_cpu_temp_time < 1.0:
+            return self._last_cpu_temp
         try:
             with open("/sys/class/thermal/thermal_zone0/temp") as f:
-                return int(f.read().strip()) / 1000.0
+                self._last_cpu_temp = int(f.read().strip()) / 1000.0
         except OSError:
-            return None
+            self._last_cpu_temp = None
+        self._last_cpu_temp_time = now
+        return self._last_cpu_temp
 
     @staticmethod
     def _annotate_frame(frame: np.ndarray, result, cpu_temp: float | None = None) -> np.ndarray:

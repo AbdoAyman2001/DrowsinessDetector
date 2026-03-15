@@ -6,25 +6,25 @@ from pathlib import Path
 @dataclass
 class Config:
     # Camera
-    camera_width: int = 1280
-    camera_height: int = 720
+    camera_width: int = 1920
+    camera_height: int = 1080
     camera_format: str = "RGB888"
     camera_buffer_count: int = 4
 
     # Eye Aspect Ratio (EAR)
     ear_threshold: float = 0.21
-    ear_consec_frames: int = 10         # ~1s at 10 processed fps -> DROWSY
-    ear_microsleep_frames: int = 30    # ~3s at 10 processed fps -> MICROSLEEP
+    ear_consec_frames: int = 8          # ~1s at 8 processed fps -> DROWSY
+    ear_microsleep_frames: int = 24    # ~3s at 8 processed fps -> MICROSLEEP
     ear_open_frames_reset: int = 3     # consecutive open frames to reset counter
 
     # Mouth Aspect Ratio (MAR)
     mar_threshold: float = 0.75
-    yawn_min_frames: int = 10         # min frames mouth open to count as yawn
+    yawn_min_frames: int = 8          # min frames mouth open to count as yawn
     yawn_count_threshold: int = 3     # yawns in window -> alarm
     yawn_window_seconds: int = 300    # 5 minutes
 
     # Face lost grace period
-    face_lost_grace_frames: int = 30  # ~3s at 10 processed fps
+    face_lost_grace_frames: int = 24  # ~3s at 8 processed fps
 
     # Alarm
     alarm_cooldown_seconds: float = 5.0

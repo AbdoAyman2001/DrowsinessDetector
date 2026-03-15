@@ -6,9 +6,9 @@ from config import Config
 
 # dlib 68-point landmark indices for mouth
 # Inner lip: top [61,62,63], bottom [67,66,65], corners [60,64]
-UPPER_LIP = [61, 62, 63]
-LOWER_LIP = [67, 66, 65]
-MOUTH_CORNERS = [60, 64]
+UPPER_LIP = np.array([61, 62, 63])
+LOWER_LIP = np.array([67, 66, 65])
+MOUTH_INDICES = np.array([60, 61, 62, 63, 64, 65, 66, 67])
 
 
 class YawnDetector:
@@ -63,16 +63,14 @@ class YawnDetector:
 
     @staticmethod
     def _compute_mar(landmarks: np.ndarray) -> float:
-        pts = landmarks.astype(np.float64)
-
-        # Sum of 3 vertical distances between upper and lower inner lip
-        vert_sum = 0.0
-        for upper_idx, lower_idx in zip(UPPER_LIP, LOWER_LIP):
-            vert_sum += np.linalg.norm(pts[upper_idx] - pts[lower_idx])
-
-        # Horizontal distance between mouth corners
-        horiz = np.linalg.norm(pts[MOUTH_CORNERS[0]] - pts[MOUTH_CORNERS[1]])
-
+        pts = landmarks[MOUTH_INDICES].astype(np.float64)
+        # pts layout: [60, 61, 62, 63, 64, 65, 66, 67] -> indices 0-7
+        # upper: 61,62,63 -> pts[1],pts[2],pts[3]
+        # lower: 67,66,65 -> pts[7],pts[6],pts[5]
+        diff_vert = pts[np.array([1, 2, 3])] - pts[np.array([7, 6, 5])]
+        vert_sum = np.sqrt((diff_vert ** 2).sum(axis=1)).sum()
+        diff_horiz = pts[0] - pts[4]  # 60 - 64
+        horiz = np.sqrt((diff_horiz ** 2).sum())
         if horiz < 1e-6:
             return 0.0
         return vert_sum / (2.0 * horiz)

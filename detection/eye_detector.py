@@ -2,8 +2,8 @@ import numpy as np
 from config import Config
 
 # dlib 68-point landmark indices for eyes
-RIGHT_EYE = [36, 37, 38, 39, 40, 41]  # P1-P6
-LEFT_EYE = [42, 43, 44, 45, 46, 47]
+RIGHT_EYE = np.array([36, 37, 38, 39, 40, 41])
+LEFT_EYE = np.array([42, 43, 44, 45, 46, 47])
 
 
 class EyeState:
@@ -58,19 +58,16 @@ class EyeDetector:
         self._state = EyeState.AWAKE
 
     def _compute_avg_ear(self, landmarks: np.ndarray) -> float:
-        right_ear = self._compute_ear(landmarks, RIGHT_EYE)
-        left_ear = self._compute_ear(landmarks, LEFT_EYE)
+        right_ear = self._compute_ear(landmarks[RIGHT_EYE].astype(np.float64))
+        left_ear = self._compute_ear(landmarks[LEFT_EYE].astype(np.float64))
         return (right_ear + left_ear) / 2.0
 
     @staticmethod
-    def _compute_ear(landmarks: np.ndarray, indices: list) -> float:
-        pts = landmarks[indices].astype(np.float64)
+    def _compute_ear(pts: np.ndarray) -> float:
         # EAR = (||P2-P6|| + ||P3-P5||) / (2 * ||P1-P4||)
-        p1, p2, p3, p4, p5, p6 = pts
-        vertical1 = np.linalg.norm(p2 - p6)
-        vertical2 = np.linalg.norm(p3 - p5)
-        horizontal = np.linalg.norm(p1 - p4)
-
-        if horizontal < 1e-6:
+        vert = pts[np.array([1, 2])] - pts[np.array([5, 4])]
+        vert_dists = np.sqrt((vert ** 2).sum(axis=1))
+        horiz = np.sqrt(((pts[0] - pts[3]) ** 2).sum())
+        if horiz < 1e-6:
             return 0.0
-        return (vertical1 + vertical2) / (2.0 * horizontal)
+        return vert_dists.sum() / (2.0 * horiz)
