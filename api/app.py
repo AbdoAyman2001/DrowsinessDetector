@@ -11,10 +11,12 @@ def create_app(shared_state: dict) -> Flask:
     from api.routes_stats import stats_bp
     from api.routes_settings import settings_bp
     from api.routes_control import control_bp
+    from api.routes_dashboard import dashboard_bp
 
     app.register_blueprint(stream_bp)
     app.register_blueprint(stats_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(control_bp)
+    app.register_blueprint(dashboard_bp)
 
     return app

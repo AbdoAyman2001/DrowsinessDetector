@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Drowsiness Detector</title>
+<style>
+:root {
+  --bg: #0d0d0d;
+  --surface: #1a1a1a;
+  --surface2: #252525;
+  --border: #2e2e2e;
+  --accent: #00d4ff;
+  --accent-dim: #007a99;
+  --warning: #ff9500;
+  --critical: #ff3b30;
+  --ok: #34c759;
+  --text: #e8e8e8;
+  --text-dim: #888;
+  --radius: 12px;
+  --tab-h: 56px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text);
+  font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+
+/* Tab bar */
+.tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: var(--tab-h);
+  background: var(--surface); border-top: 1px solid var(--border);
+  display: flex; z-index: 100; padding-bottom: env(safe-area-inset-bottom); }
+.tab { flex: 1; background: none; border: none; color: var(--text-dim);
+  font-size: 13px; cursor: pointer; transition: color 0.2s;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.tab svg { width: 22px; height: 22px; fill: currentColor; }
+.tab.active { color: var(--accent); }
+
+/* Panels */
+.panel { display: none; padding: 16px; padding-bottom: calc(var(--tab-h) + 24px);
+  min-height: 100vh; overflow-y: auto; }
+.panel.active { display: block; }
+.panel h2 { font-size: 20px; margin-bottom: 16px; font-weight: 700; }
+
+/* Video */
+.video-wrap { position: relative; border-radius: var(--radius); overflow: hidden;
+  background: #000; aspect-ratio: 16/9; }
+#video-stream { width: 100%; height: 100%; object-fit: cover; display: block; }
+#no-face { display: none; position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%,-50%); color: var(--critical);
+  font-size: 18px; font-weight: 700; background: rgba(0,0,0,0.6);
+  padding: 6px 16px; border-radius: 8px; }
+
+/* Status grid */
+.status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.stat-card { background: var(--surface); border-radius: var(--radius);
+  padding: 14px; border: 1px solid var(--border); }
+.stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 4px; }
+.stat-value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; direction: ltr; text-align: left; }
+
+/* Alarm badge */
+.alarm-wrap { margin-top: 14px; text-align: center; }
+.alarm-badge { display: inline-block; padding: 6px 18px; border-radius: 20px;
+  font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.alarm-none { background: rgba(52,199,89,0.15); color: var(--ok); }
+.alarm-warning { background: rgba(255,149,0,0.15); color: var(--warning); }
+.alarm-critical { background: rgba(255,59,48,0.2); color: var(--critical);
+  animation: pulse 0.6s infinite alternate; }
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.5; } }
+
+/* Forms */
+.section-title { font-size: 12px; color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.5px; margin: 20px 0 10px; }
+.section-title:first-child { margin-top: 0; }
+.field { margin-bottom: 12px; }
+.field label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
+.field input, .field select { width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 15px; }
+.field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+
+/* Buttons */
+.btn { display: block; width: 100%; padding: 14px; border: none; border-radius: var(--radius);
+  font-size: 16px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; margin-top: 12px; }
+.btn:active { opacity: 0.7; }
+.btn-primary { background: var(--accent); color: #000; }
+.btn-warning { background: var(--warning); color: #000; }
+.btn-danger { background: var(--critical); color: #fff; }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-sm { display: inline-block; width: auto; padding: 8px 16px; font-size: 14px; }
+
+/* Sessions */
+.session-item { background: var(--surface); border-radius: var(--radius);
+  padding: 14px; margin-bottom: 10px; cursor: pointer; border: 1px solid var(--border); }
+.session-item:active { border-color: var(--accent); }
+.session-meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; direction: ltr; text-align: left; }
+.event-item { padding: 10px 12px; background: var(--surface2); border-radius: 8px;
+  margin-bottom: 6px; font-size: 13px; direction: ltr; text-align: left; }
+.event-drowsy { border-right: 3px solid var(--warning); }
+.event-microsleep { border-right: 3px solid var(--critical); }
+.event-yawn { border-right: 3px solid var(--accent-dim); }
+.back-link { color: var(--accent); font-size: 14px; cursor: pointer; margin-bottom: 12px; display: inline-block; }
+
+/* Controls */
+.control-group { background: var(--surface); border-radius: var(--radius);
+  padding: 16px; border: 1px solid var(--border); margin-bottom: 14px; }
+.control-group h3 { font-size: 15px; margin-bottom: 12px; }
+.toggle-group { display: flex; gap: 8px; margin-bottom: 12px; }
+.toggle-btn { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface2); color: var(--text-dim); font-size: 14px; cursor: pointer; text-align: center; }
+.toggle-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.1); }
+.slider-wrap { margin-bottom: 8px; }
+.slider-wrap input[type=range] { width: 100%; accent-color: var(--accent); }
+.slider-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); }
+
+/* Stats table */
+.stats-table { width: 100%; border-collapse: collapse; font-size: 13px; direction: ltr; text-align: left; }
+.stats-table th { color: var(--text-dim); font-weight: 500; padding: 8px 6px;
+  border-bottom: 1px solid var(--border); text-align: left; }
+.stats-table td { padding: 8px 6px; border-bottom: 1px solid var(--border); }
+
+/* Calibration */
+.calib-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 16px; }
+.calib-box h4 { font-size: 14px; margin-bottom: 8px; }
+.calib-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; margin: 10px 0; }
+.calib-bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 3px;
+  transition: width 0.3s; }
+.calib-live { font-size: 24px; font-weight: 700; direction: ltr; text-align: left;
+  font-variant-numeric: tabular-nums; color: var(--accent); margin: 6px 0; }
+.calib-hint { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+
+/* Toast */
+.toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 10px 20px; border-radius: 20px; font-size: 14px;
+  z-index: 200; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+/* Responsive */
+@media (min-width: 600px) {
+  .panel { max-width: 480px; margin: 0 auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== LIVE TAB ===== -->
+<div id="tab-live" class="panel active">
+  <div class="video-wrap">
+    <img id="video-stream" src="/api/stream" alt="Live">
+    <div id="no-face">NO FACE</div>
+  </div>
+  <div class="status-grid">
+    <div class="stat-card">
+      <div class="stat-label">EAR</div>
+      <div class="stat-value" id="v-ear">&mdash;</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">MAR</div>
+      <div class="stat-value" id="v-mar">&mdash;</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Eye State</div>
+      <div class="stat-value" id="v-eye" style="font-size:16px">&mdash;</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Yawns</div>
+      <div class="stat-value" id="v-yawn">&mdash;</div>
+    </div>
+  </div>
+  <div class="alarm-wrap">
+    <span class="alarm-badge alarm-none" id="alarm-badge">OK</span>
+  </div>
+</div>
+
+<!-- ===== SETTINGS TAB ===== -->
+<div id="tab-settings" class="panel">
+  <h2>Settings</h2>
+  <form id="settings-form" onsubmit="return false">
+    <div class="section-title">Driver Info</div>
+    <div class="field">
+      <label>Driver Name</label>
+      <input type="text" data-key="driver_name" dir="rtl" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Phone Number</label>
+      <input type="tel" data-key="gsm_phone_number" dir="ltr" placeholder="+201xxxxxxxxx">
+    </div>
+
+    <div class="section-title">Eye Detection</div>
+    <div class="calib-box" id="calib-box">
+      <h4>EAR Calibration</h4>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Look at the camera with eyes open naturally. Samples your EAR for 5 seconds and sets the threshold automatically.</p>
+      <div class="calib-live" id="calib-ear">&mdash;</div>
+      <div class="calib-bar"><div class="calib-bar-fill" id="calib-progress"></div></div>
+      <div class="calib-hint" id="calib-status">Press Calibrate to start</div>
+      <button type="button" class="btn btn-secondary btn-sm" id="calib-btn" onclick="startCalibration()">Calibrate</button>
+    </div>
+    <div class="field">
+      <label>EAR Threshold</label>
+      <input type="number" data-key="ear_threshold" step="0.01" min="0.1" max="0.4">
+    </div>
+    <div class="field">
+      <label>Drowsy Frames</label>
+      <input type="number" data-key="ear_consec_frames" min="1" max="50">
+    </div>
+    <div class="field">
+      <label>Microsleep Frames</label>
+      <input type="number" data-key="ear_microsleep_frames" min="1" max="100">
+    </div>
+
+    <div class="section-title">Yawn Detection</div>
+    <div class="field">
+      <label>MAR Threshold</label>
+      <input type="number" data-key="mar_threshold" step="0.05" min="0.3" max="1.5">
+    </div>
+    <div class="field">
+      <label>Yawn Count Threshold</label>
+      <input type="number" data-key="yawn_count_threshold" min="1" max="10">
+    </div>
+    <div class="field">
+      <label>Yawn Window (seconds)</label>
+      <input type="number" data-key="yawn_window_seconds" min="60" max="600">
+    </div>
+
+    <div class="section-title">Alarm</div>
+    <div class="field">
+      <label>Cooldown (seconds)</label>
+      <input type="number" data-key="alarm_cooldown_seconds" step="0.5" min="1" max="30">
+    </div>
+    <div class="field">
+      <label>Volume</label>
+      <input type="number" data-key="alarm_volume" step="0.1" min="0" max="1">
+    </div>
+
+    <button type="button" class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+  </form>
+</div>
+
+<!-- ===== SESSIONS TAB ===== -->
+<div id="tab-sessions" class="panel">
+  <h2>Sessions</h2>
+  <div id="sessions-list"></div>
+  <div id="session-detail" style="display:none">
+    <span class="back-link" onclick="showSessionList()">&larr; Back</span>
+    <div id="session-events"></div>
+  </div>
+</div>
+
+<!-- ===== CONTROLS TAB ===== -->
+<div id="tab-controls" class="panel">
+  <h2>Controls</h2>
+
+  <div class="control-group">
+    <h3>Alarm Test</h3>
+    <div class="toggle-group">
+      <button class="toggle-btn active" onclick="setTestLevel(this,'warning')">Warning</button>
+      <button class="toggle-btn" onclick="setTestLevel(this,'critical')">Critical</button>
+    </div>
+    <div class="slider-wrap">
+      <div class="slider-label"><span>Duration</span><span id="dur-label">3s</span></div>
+      <input type="range" id="test-duration" min="1" max="10" value="3"
+        oninput="document.getElementById('dur-label').textContent=this.value+'s'">
+    </div>
+    <button class="btn btn-warning btn-sm" onclick="testAlarm()">Test Alarm</button>
+  </div>
+
+  <div class="control-group">
+    <h3>Reset Counters</h3>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Reset yawn count and eye state counters</p>
+    <button class="btn btn-danger btn-sm" onclick="resetCounters()">Reset</button>
+  </div>
+
+  <div class="control-group">
+    <h3>Daily Stats</h3>
+    <table class="stats-table" id="stats-table">
+      <thead><tr><th>Date</th><th>Drowsy</th><th>Microsleep</th><th>Yawns</th></tr></thead>
+      <tbody id="stats-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== TAB BAR ===== -->
+<nav class="tab-bar">
+  <button class="tab active" data-tab="live">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2a10 10 0 1010 10A10 10 0 0012 2zm0 18a8 8 0 118-8 8 8 0 01-8 8z"/></svg>
+    <span>Live</span>
+  </button>
+  <button class="tab" data-tab="settings">
+    <svg viewBox="0 0 24 24"><path d="M19.14 12.94a7.07 7.07 0 000-1.88l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96a7.04 7.04 0 00-1.62-.94l-.36-2.54a.48.48 0 00-.48-.41h-3.84a.48.48 0 00-.48.41l-.36 2.54a7.04 7.04 0 00-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87a.48.48 0 00.12.61l2.03 1.58a7.07 7.07 0 000 1.88l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32a.49.49 0 00.59.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.05.24.26.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 00-.12-.61zM12 15.6A3.6 3.6 0 1115.6 12 3.6 3.6 0 0112 15.6z"/></svg>
+    <span>Settings</span>
+  </button>
+  <button class="tab" data-tab="sessions">
+    <svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 117 7 6.97 6.97 0 01-4.95-2.05l-1.41 1.41A8.96 8.96 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z"/></svg>
+    <span>Sessions</span>
+  </button>
+  <button class="tab" data-tab="controls">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+    <span>Controls</span>
+  </button>
+</nav>
+
+<!-- ===== TOAST ===== -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  /* ---- Tab switching ---- */
+  var tabs = document.querySelectorAll('.tab');
+  var panels = document.querySelectorAll('.panel');
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      tabs.forEach(function(t) { t.classList.remove('active'); });
+      panels.forEach(function(p) { p.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+      if (tab.dataset.tab === 'settings') loadSettings();
+      if (tab.dataset.tab === 'sessions') loadSessions();
+      if (tab.dataset.tab === 'controls') loadDailyStats();
+    });
+  });
+
+  /* ---- Status poller ---- */
+  setInterval(function() {
+    fetch('/api/status').then(function(r) { return r.json(); }).then(function(d) {
+      document.getElementById('v-ear').textContent = d.ear.toFixed(3);
+      document.getElementById('v-mar').textContent = d.mar.toFixed(3);
+      document.getElementById('v-eye').textContent = d.eye_state || '\u2014';
+      document.getElementById('v-yawn').textContent = d.yawn_count;
+      var badge = document.getElementById('alarm-badge');
+      badge.className = 'alarm-badge alarm-' + d.alarm_level;
+      badge.textContent = d.alarm_level === 'none' ? 'OK' : d.alarm_level.toUpperCase();
+      document.getElementById('no-face').style.display = d.face_detected ? 'none' : 'block';
+    }).catch(function() {});
+  }, 500);
+
+  /* ---- Video stream retry ---- */
+  var vid = document.getElementById('video-stream');
+  vid.onerror = function() {
+    setTimeout(function() { vid.src = '/api/stream?' + Date.now(); }, 3000);
+  };
+
+  /* ---- Settings ---- */
+  var settingsLoaded = false;
+  window.loadSettings = function() {
+    fetch('/api/settings').then(function(r) { return r.json(); }).then(function(cfg) {
+      var inputs = document.querySelectorAll('#settings-form [data-key]');
+      inputs.forEach(function(el) {
+        if (cfg[el.dataset.key] !== undefined) el.value = cfg[el.dataset.key];
+      });
+      settingsLoaded = true;
+    }).catch(function() {});
+  };
+
+  window.saveSettings = function() {
+    var inputs = document.querySelectorAll('#settings-form [data-key]');
+    var updates = {};
+    inputs.forEach(function(el) {
+      updates[el.dataset.key] = el.type === 'number' ? Number(el.value) : el.value;
+    });
+    fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    }).then(function(r) {
+      if (r.ok) showToast('Settings saved');
+      else showToast('Save failed', 'var(--critical)');
+    }).catch(function() { showToast('Network error', 'var(--critical)'); });
+  };
+
+  /* ---- Sessions ---- */
+  window.loadSessions = function() {
+    document.getElementById('session-detail').style.display = 'none';
+    document.getElementById('sessions-list').style.display = 'block';
+    fetch('/api/sessions').then(function(r) { return r.json(); }).then(function(list) {
+      var html = '';
+      if (!list.length) { html = '<p style="color:var(--text-dim)">No sessions yet</p>'; }
+      list.forEach(function(s) {
+        html += '<div class="session-item" onclick="loadEvents(' + s.id + ')">'
+          + '<div style="font-weight:600">Session #' + s.id + '</div>'
+          + '<div class="session-meta">' + (s.started_at || '') + '</div>'
+          + '</div>';
+      });
+      document.getElementById('sessions-list').innerHTML = html;
+    }).catch(function() {});
+  };
+
+  window.loadEvents = function(id) {
+    document.getElementById('sessions-list').style.display = 'none';
+    document.getElementById('session-detail').style.display = 'block';
+    fetch('/api/sessions/' + id + '/events').then(function(r) { return r.json(); }).then(function(events) {
+      var html = '<h3 style="margin-bottom:10px">Session #' + id + ' Events</h3>';
+      if (!events.length) { html += '<p style="color:var(--text-dim)">No events</p>'; }
+      events.forEach(function(e) {
+        var cls = 'event-item';
+        if (e.event_type === 'drowsy') cls += ' event-drowsy';
+        else if (e.event_type === 'microsleep') cls += ' event-microsleep';
+        else if (e.event_type === 'yawn') cls += ' event-yawn';
+        html += '<div class="' + cls + '">'
+          + '<strong>' + (e.event_type || '') + '</strong> '
+          + '<span style="color:var(--text-dim)">' + (e.timestamp || '') + '</span>'
+          + '</div>';
+      });
+      document.getElementById('session-events').innerHTML = html;
+    }).catch(function() {});
+  };
+
+  window.showSessionList = function() {
+    document.getElementById('session-detail').style.display = 'none';
+    document.getElementById('sessions-list').style.display = 'block';
+  };
+
+  /* ---- Controls ---- */
+  var testLevel = 'warning';
+  window.setTestLevel = function(btn, level) {
+    testLevel = level;
+    document.querySelectorAll('.toggle-group .toggle-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+  };
+
+  window.testAlarm = function() {
+    var dur = document.getElementById('test-duration').value;
+    fetch('/api/control/alarm-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level: testLevel, duration: Number(dur) })
+    }).then(function(r) {
+      if (r.ok) showToast('Alarm triggered');
+      else showToast('Failed', 'var(--critical)');
+    }).catch(function() { showToast('Network error', 'var(--critical)'); });
+  };
+
+  window.resetCounters = function() {
+    if (!confirm('Reset all counters?')) return;
+    fetch('/api/control/reset-counters', { method: 'POST' }).then(function(r) {
+      if (r.ok) showToast('Counters reset');
+    }).catch(function() {});
+  };
+
+  window.loadDailyStats = function() {
+    fetch('/api/stats/daily').then(function(r) { return r.json(); }).then(function(stats) {
+      var html = '';
+      if (!stats.length) { html = '<tr><td colspan="4" style="color:var(--text-dim)">No data</td></tr>'; }
+      stats.forEach(function(s) {
+        html += '<tr><td>' + s.date + '</td><td>' + (s.drowsy_count || 0)
+          + '</td><td>' + (s.microsleep_count || 0)
+          + '</td><td>' + (s.yawn_count || 0) + '</td></tr>';
+      });
+      document.getElementById('stats-body').innerHTML = html;
+    }).catch(function() {});
+  };
+
+  /* ---- EAR Calibration ---- */
+  var calibRunning = false;
+  window.startCalibration = function() {
+    if (calibRunning) return;
+    calibRunning = true;
+    var samples = [];
+    var duration = 5000;
+    var start = Date.now();
+    var btn = document.getElementById('calib-btn');
+    var status = document.getElementById('calib-status');
+    var progress = document.getElementById('calib-progress');
+    var earDisplay = document.getElementById('calib-ear');
+    btn.disabled = true;
+    btn.textContent = 'Sampling...';
+    status.textContent = 'Keep eyes open naturally';
+    status.style.color = 'var(--accent)';
+
+    var timer = setInterval(function() {
+      var elapsed = Date.now() - start;
+      var pct = Math.min(100, (elapsed / duration) * 100);
+      progress.style.width = pct + '%';
+
+      fetch('/api/status').then(function(r) { return r.json(); }).then(function(d) {
+        if (d.face_detected && d.ear > 0.05) {
+          samples.push(d.ear);
+          earDisplay.textContent = d.ear.toFixed(3);
+        } else {
+          status.textContent = 'No face detected - look at camera';
+          status.style.color = 'var(--warning)';
+        }
+      }).catch(function() {});
+
+      if (elapsed >= duration) {
+        clearInterval(timer);
+        progress.style.width = '100%';
+        calibRunning = false;
+        btn.disabled = false;
+        btn.textContent = 'Calibrate';
+
+        if (samples.length < 5) {
+          status.textContent = 'Not enough samples. Try again.';
+          status.style.color = 'var(--critical)';
+          earDisplay.textContent = '\u2014';
+          return;
+        }
+
+        // Sort and trim outliers (remove top/bottom 10%)
+        samples.sort(function(a, b) { return a - b; });
+        var trim = Math.max(1, Math.floor(samples.length * 0.1));
+        var trimmed = samples.slice(trim, samples.length - trim);
+        var avg = trimmed.reduce(function(s, v) { return s + v; }, 0) / trimmed.length;
+        var threshold = Math.round(avg * 0.7 * 100) / 100; // 70% of average
+
+        earDisplay.textContent = avg.toFixed(3) + ' \u2192 ' + threshold.toFixed(2);
+        status.textContent = 'Avg EAR: ' + avg.toFixed(3) + ' | Threshold set to 70%';
+        status.style.color = 'var(--ok)';
+
+        // Update the threshold input and save
+        var input = document.querySelector('[data-key="ear_threshold"]');
+        input.value = threshold;
+        fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ear_threshold: threshold })
+        }).then(function(r) {
+          if (r.ok) showToast('EAR threshold calibrated to ' + threshold.toFixed(2));
+        }).catch(function() {});
+      }
+    }, 200);
+  };
+
+  /* ---- Toast ---- */
+  window.showToast = function(msg, color) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.color = color || 'var(--ok)';
+    t.classList.add('show');
+    setTimeout(function() { t.classList.remove('show'); }, 2500);
+  };
+})();
+</script>
+</body>
+</html>
